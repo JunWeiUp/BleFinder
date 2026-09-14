@@ -13,6 +13,13 @@
     <string name="rename_title">Rename device</string>
     <string name="rename_hint">Custom name</string>
     <string name="clear_name">Clear name</string>
+    <string name="calibrate">📏 Calibrate</string>
+    <string name="calibrate_title">Calibrate at 1 meter</string>
+    <string name="calibrate_msg">Hold the phone about one meter (a big step) away from the device and keep still. The app samples the signal for 3 seconds, so distance estimates for this device become far more accurate than the generic default.</string>
+    <string name="calibrate_start">Start</string>
+    <string name="calibrating">Calibrating…</string>
+    <string name="calibrate_done">Calibrated: 1 m ≈ %1$d dBm. Distance estimates for this device are now much more accurate.</string>
+    <string name="calibrate_failed">Signal too weak or unstable. Get closer to the device and try again.</string>
     <string name="waiting_signal">Waiting for signal…</string>
     <string name="rssi_value">%1$d dBm</string>
     <string name="distance_fmt">Approx. %1$s m (%2$s)</string>

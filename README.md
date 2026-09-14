@@ -16,6 +16,7 @@ Find lost Bluetooth devices by tracking their signal strength (RSSI) in real tim
 - **Tracking mode**:
   - Large, smoothed live RSSI reading (exponential moving average)
   - Signal strength bar and a rough distance estimate (log-distance model)
+  - **Per-device 1-meter calibration** — sample the target device once at 1 m; distance estimates for that device become far more accurate than the generic default
   - Trend arrow: ↑ getting closer / ↓ moving away / → steady (last 2 s vs. 4–8 s ago)
   - Live signal-history chart
   - **Beep that speeds up as you approach** — no need to watch the screen while crawling under the bed

@@ -1,7 +1,6 @@
 package com.blefinder.app
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -54,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private var scanning = false
     private val devices = HashMap<String, DeviceEntry>()
     private val customNames = HashMap<String, String>()
+    private val calibratedTx = HashMap<String, Double>()
 
     private var targetMac: String? = null
 
@@ -64,6 +64,9 @@ class MainActivity : AppCompatActivity() {
     private var lastVibrateAt = 0L
     private var tone: ToneGenerator? = null
     private var beepLoopActive = false
+
+    // ---------- 校准状态 ----------
+    private var calibrationSamples: MutableList<Int>? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -93,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         customNames.putAll(DeviceNameStore.all(this))
+        calibratedTx.putAll(CalibrationStore.all(this))
 
         scanManager = ScanManager(this)
         scanManager.onDeviceFound = { found -> mainHandler.post { handleFound(found) } }
@@ -107,6 +111,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnScan.setOnClickListener { if (scanning) stopScan() else maybeStart() }
         binding.btnBack.setOnClickListener { stopTracking() }
         binding.btnRename.setOnClickListener { targetMac?.let { showRenameDialog(it) } }
+        binding.btnCalibrate.setOnClickListener { targetMac?.let { showCalibrateDialog(it) } }
         binding.checkBeep.setOnCheckedChangeListener { _, checked ->
             if (checked && targetMac != null && !beepLoopActive) {
                 beepLoopActive = true
@@ -274,6 +279,46 @@ class MainActivity : AppCompatActivity() {
         refreshDeviceList()
     }
 
+    // ---------- 1 米校准 ----------
+
+    private fun showCalibrateDialog(mac: String) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.calibrate_title)
+            .setMessage(R.string.calibrate_msg)
+            .setPositiveButton(R.string.calibrate_start) { _, _ -> startCalibration(mac) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun startCalibration(mac: String) {
+        calibrationSamples = mutableListOf()
+        binding.btnCalibrate.setText(R.string.calibrating)
+        mainHandler.postDelayed({ finishCalibration(mac) }, CALIBRATION_MS + 200)
+    }
+
+    private fun finishCalibration(mac: String) {
+        val samples = calibrationSamples ?: return
+        calibrationSamples = null
+        binding.btnCalibrate.setText(R.string.calibrate)
+        if (targetMac != mac) return // 已退出追踪，丢弃本次采样
+        if (samples.size < 6) {
+            Toast.makeText(this, R.string.calibrate_failed, Toast.LENGTH_LONG).show()
+            return
+        }
+        val tx = median(samples)
+        calibratedTx[mac] = tx
+        CalibrationStore.put(this, mac, tx)
+        Toast.makeText(this, getString(R.string.calibrate_done, tx.roundToInt()), Toast.LENGTH_LONG).show()
+        ema?.let { renderTracking(it, SystemClock.elapsedRealtime()) }
+    }
+
+    private fun median(values: List<Int>): Double {
+        val sorted = values.sorted()
+        val mid = sorted.size / 2
+        return if (sorted.size % 2 == 1) sorted[mid].toDouble()
+        else (sorted[mid - 1] + sorted[mid]) / 2.0
+    }
+
     // ---------- 追踪 ----------
 
     private fun startTracking(mac: String) {
@@ -305,6 +350,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopTracking() {
         targetMac = null
+        calibrationSamples = null
+        binding.btnCalibrate.setText(R.string.calibrate)
         beepLoopActive = false
         mainHandler.removeCallbacks(beepRunnable)
         tone?.release()
@@ -320,6 +367,8 @@ class MainActivity : AppCompatActivity() {
         ema = e
         val now = SystemClock.elapsedRealtime()
 
+        calibrationSamples?.add(rawRssi)
+
         history.add(e.toFloat())
         if (history.size > 150) history.removeAt(0)
         trendSamples.addLast(now to e)
@@ -327,6 +376,21 @@ class MainActivity : AppCompatActivity() {
             trendSamples.removeFirst()
         }
 
+        renderTracking(e, now)
+
+        if (binding.checkVibrate.isChecked &&
+            computeTrend(now) >= 3.0 && e >= -85 && now - lastVibrateAt > 1200
+        ) {
+            lastVibrateAt = now
+            vibrate()
+        }
+        if (!beepLoopActive && binding.checkBeep.isChecked) {
+            beepLoopActive = true
+            mainHandler.post(beepRunnable)
+        }
+    }
+
+    private fun renderTracking(e: Double, now: Long) {
         binding.textRssi.text = getString(R.string.rssi_value, e.roundToInt())
 
         val pct = (((e + 100.0) / 60.0) * 100).coerceIn(0.0, 100.0).roundToInt()
@@ -367,21 +431,13 @@ class MainActivity : AppCompatActivity() {
             }
         )
         binding.textTrend.setTextColor(ContextCompat.getColor(this, trendColor))
-
-        if (binding.checkVibrate.isChecked &&
-            trend >= 3.0 && e >= -85 && now - lastVibrateAt > 1200
-        ) {
-            lastVibrateAt = now
-            vibrate()
-        }
-        if (!beepLoopActive && binding.checkBeep.isChecked) {
-            beepLoopActive = true
-            mainHandler.post(beepRunnable)
-        }
     }
 
-    /** 对数距离模型：d = 10^((A - rssi) / (10n))，A=-59dBm@1m，n=2.5（室内粗略值） */
-    private fun estimateMeters(e: Double): Double = Math.pow(10.0, (-59.0 - e) / 25.0)
+    /** 对数距离模型：d = 10^((txPower - rssi) / (10n))，优先用该设备的 1 米校准值 */
+    private fun estimateMeters(e: Double): Double {
+        val tx = targetMac?.let { calibratedTx[it] } ?: DEFAULT_TX_POWER
+        return Math.pow(10.0, (tx - e) / 25.0)
+    }
 
     private fun formatMeters(m: Double): String = when {
         m < 1.0 -> "<1"
@@ -433,5 +489,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val STALE_MS = 20_000L
         private const val TREND_THRESHOLD = 2.5
+        private const val DEFAULT_TX_POWER = -59.0
+        private const val CALIBRATION_MS = 3000L
     }
 }

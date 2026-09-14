@@ -13,6 +13,13 @@
     <string name="rename_title">重命名设备</string>
     <string name="rename_hint">自定义名称</string>
     <string name="clear_name">清除命名</string>
+    <string name="calibrate">📏 校准</string>
+    <string name="calibrate_title">1 米校准</string>
+    <string name="calibrate_msg">把手机举到离设备约 1 米（一大步）的位置并保持不动，应用将采样 3 秒信号。校准后，这台设备的距离估算会比通用默认值准确得多。</string>
+    <string name="calibrate_start">开始校准</string>
+    <string name="calibrating">校准中…</string>
+    <string name="calibrate_done">校准完成：1 米 ≈ %1$d dBm，该设备的距离估算已更准确。</string>
+    <string name="calibrate_failed">信号太弱或不稳定，请离设备更近一些再试。</string>
     <string name="waiting_signal">等待信号…</string>
     <string name="rssi_value">%1$d dBm</string>
     <string name="distance_fmt">估计距离约 %1$s 米（%2$s）</string>
