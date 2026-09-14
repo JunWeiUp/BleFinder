@@ -371,6 +371,8 @@ class MainActivity : AppCompatActivity() {
         ema = null
         history.clear()
         trendSamples.clear()
+        binding.scanPanel.isVisible = false
+        binding.trackPanel.isVisible = true
         showTrackSection(SECTION_MAIN)
         binding.trackName.text = devices[mac]?.displayName
             ?: getString(R.string.unknown_device)
