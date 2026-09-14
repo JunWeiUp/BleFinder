@@ -30,7 +30,9 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.blefinder.app.databinding.ActivityMainBinding
 import java.util.Locale
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 class MainActivity : AppCompatActivity() {
 
@@ -47,6 +49,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var scanManager: ScanManager
+    private lateinit var sensorTracker: SensorTracker
     private lateinit var listAdapter: DeviceListAdapter
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -67,6 +70,12 @@ class MainActivity : AppCompatActivity() {
 
     // ---------- 校准状态 ----------
     private var calibrationSamples: MutableList<Int>? = null
+
+    // ---------- 罗盘 / 轨迹状态 ----------
+    private val compassBins = FloatArray(CompassView.BIN_COUNT) { Float.NaN }
+    private val trailPoints = ArrayList<TrailPoint>()
+    private var trailX = 0.0
+    private var trailY = 0.0
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -101,6 +110,21 @@ class MainActivity : AppCompatActivity() {
         scanManager = ScanManager(this)
         scanManager.onDeviceFound = { found -> mainHandler.post { handleFound(found) } }
 
+        sensorTracker = SensorTracker(this)
+        sensorTracker.onRotation = { azScreen, _ ->
+            if (binding.sectionCompass.isVisible) {
+                binding.compassView.currentAzimuthDeg = azScreen
+            }
+        }
+        sensorTracker.onStep = { azTop ->
+            if (binding.sectionTrail.isVisible && ema != null) {
+                trailX += STEP_LEN * sin(Math.toRadians(azTop.toDouble()))
+                trailY += STEP_LEN * cos(Math.toRadians(azTop.toDouble()))
+                trailPoints.add(TrailPoint(trailX, trailY, ema!!.toFloat()))
+                binding.trailView.points = trailPoints.toList()
+            }
+        }
+
         listAdapter = DeviceListAdapter(
             onClick = { entry -> startTracking(entry.mac) },
             onRename = { entry -> showRenameDialog(entry.mac) }
@@ -112,6 +136,26 @@ class MainActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { stopTracking() }
         binding.btnRename.setOnClickListener { targetMac?.let { showRenameDialog(it) } }
         binding.btnCalibrate.setOnClickListener { targetMac?.let { showCalibrateDialog(it) } }
+        binding.btnCompass.setOnClickListener { showTrackSection(SECTION_COMPASS) }
+        binding.btnTrail.setOnClickListener { showTrackSection(SECTION_TRAIL) }
+        binding.btnCompassClose.setOnClickListener { showTrackSection(SECTION_MAIN) }
+        binding.btnTrailClose.setOnClickListener { showTrackSection(SECTION_MAIN) }
+        binding.btnCompassReset.setOnClickListener {
+            compassBins.fill(Float.NaN)
+            binding.compassView.bins = compassBins.copyOf()
+            binding.compassView.conclusionAzimuthDeg = Float.NaN
+            binding.compassStatus.setText(R.string.compass_none)
+        }
+        binding.btnTrailClear.setOnClickListener {
+            trailPoints.clear()
+            trailX = 0.0
+            trailY = 0.0
+            binding.trailView.points = emptyList()
+        }
+        if (!sensorTracker.hasSensors) {
+            binding.btnCompass.isEnabled = false
+            binding.btnTrail.isEnabled = false
+        }
         binding.checkBeep.setOnCheckedChangeListener { _, checked ->
             if (checked && targetMac != null && !beepLoopActive) {
                 beepLoopActive = true
@@ -144,6 +188,7 @@ class MainActivity : AppCompatActivity() {
         tone?.release()
         tone = null
         scanManager.stop()
+        sensorTracker.stop()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         super.onDestroy()
     }
@@ -326,11 +371,10 @@ class MainActivity : AppCompatActivity() {
         ema = null
         history.clear()
         trendSamples.clear()
+        showTrackSection(SECTION_MAIN)
         binding.trackName.text = devices[mac]?.displayName
             ?: getString(R.string.unknown_device)
         binding.trackMac.text = mac
-        binding.scanPanel.isVisible = false
-        binding.trackPanel.isVisible = true
         binding.textRssi.setText(R.string.waiting_signal)
         binding.textDistance.text = ""
         binding.textTrend.text = ""
@@ -342,6 +386,7 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {
             null
         }
+        sensorTracker.start()
         if (!scanning) {
             scanning = true
             scanManager.start()
@@ -356,9 +401,20 @@ class MainActivity : AppCompatActivity() {
         mainHandler.removeCallbacks(beepRunnable)
         tone?.release()
         tone = null
+        sensorTracker.stop()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.trackPanel.isVisible = false
         binding.scanPanel.isVisible = true
+    }
+
+    private fun showTrackSection(section: Int) {
+        binding.sectionMain.isVisible = section == SECTION_MAIN
+        binding.sectionCompass.isVisible = section == SECTION_COMPASS
+        binding.sectionTrail.isVisible = section == SECTION_TRAIL
+        if (section == SECTION_COMPASS) {
+            binding.compassView.bins = compassBins.copyOf()
+            updateCompassConclusion()
+        }
     }
 
     private fun updateTracking(rawRssi: Int) {
@@ -374,6 +430,17 @@ class MainActivity : AppCompatActivity() {
         trendSamples.addLast(now to e)
         while (trendSamples.isNotEmpty() && now - trendSamples.first().first > 8000) {
             trendSamples.removeFirst()
+        }
+
+        if (binding.sectionCompass.isVisible) {
+            val az = sensorTracker.lastAzimuthScreenDeg
+            if (!az.isNaN()) {
+                val idx = ((az / CompassView.BIN_DEGREES).toInt() + CompassView.BIN_COUNT) % CompassView.BIN_COUNT
+                compassBins[idx] = if (compassBins[idx].isNaN()) e.toFloat()
+                else compassBins[idx] * 0.7f + e.toFloat() * 0.3f
+                binding.compassView.bins = compassBins.copyOf()
+                updateCompassConclusion()
+            }
         }
 
         renderTracking(e, now)
@@ -433,6 +500,60 @@ class MainActivity : AppCompatActivity() {
         binding.textTrend.setTextColor(ContextCompat.getColor(this, trendColor))
     }
 
+    // ---------- 方向罗盘 ----------
+
+    /**
+     * 身体屏蔽原理：手机贴胸、屏幕朝外时，身体挡住身后的信号。
+     * 信号最强的面朝方位 ≈ 设备方向；若多个不相邻方位都强（反射），置信度降为低。
+     */
+    private fun updateCompassConclusion() {
+        val sampled = (0 until CompassView.BIN_COUNT).filter { !compassBins[it].isNaN() }
+        if (sampled.size < 8) {
+            binding.compassView.conclusionAzimuthDeg = Float.NaN
+            binding.compassStatus.text = getString(R.string.compass_coverage, sampled.size)
+            return
+        }
+        var bestIdx = -1
+        var bestVal = Float.NEGATIVE_INFINITY
+        compassBins.forEachIndexed { i, v ->
+            if (!v.isNaN() && v > bestVal) {
+                bestVal = v
+                bestIdx = i
+            }
+        }
+        var secondVal = Float.NEGATIVE_INFINITY
+        sampled.forEach { i ->
+            if (binDistance(i, bestIdx) >= 2 && compassBins[i] > secondVal) {
+                secondVal = compassBins[i]
+            }
+        }
+        val confident = secondVal == Float.NEGATIVE_INFINITY || bestVal - secondVal >= 4f
+        val azimuth = bestIdx * CompassView.BIN_DEGREES + CompassView.BIN_DEGREES / 2f
+        binding.compassView.conclusionAzimuthDeg = azimuth
+        binding.compassStatus.text = getString(
+            if (confident) R.string.compass_result_high else R.string.compass_result_low,
+            directionName(azimuth)
+        )
+    }
+
+    private fun binDistance(a: Int, b: Int): Int {
+        val d = kotlin.math.abs(a - b)
+        return minOf(d, CompassView.BIN_COUNT - d)
+    }
+
+    private fun directionName(azimuth: Float): String {
+        val idx = (((azimuth + 22.5f) / 45f).toInt() % 8 + 8) % 8
+        return getString(
+            intArrayOf(
+                R.string.dir_north, R.string.dir_northeast, R.string.dir_east,
+                R.string.dir_southeast, R.string.dir_south, R.string.dir_southwest,
+                R.string.dir_west, R.string.dir_northwest
+            )[idx]
+        )
+    }
+
+    // ---------- 距离与趋势 ----------
+
     /** 对数距离模型：d = 10^((txPower - rssi) / (10n))，优先用该设备的 1 米校准值 */
     private fun estimateMeters(e: Double): Double {
         val tx = targetMac?.let { calibratedTx[it] } ?: DEFAULT_TX_POWER
@@ -491,5 +612,9 @@ class MainActivity : AppCompatActivity() {
         private const val TREND_THRESHOLD = 2.5
         private const val DEFAULT_TX_POWER = -59.0
         private const val CALIBRATION_MS = 3000L
+        private const val STEP_LEN = 0.7
+        private const val SECTION_MAIN = 0
+        private const val SECTION_COMPASS = 1
+        private const val SECTION_TRAIL = 2
     }
 }
