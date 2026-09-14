@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#0E1420</color>
+    <color name="surface">#1B2333</color>
+    <color name="text_primary">#E8ECF4</color>
+    <color name="text_secondary">#8A94A8</color>
+    <color name="signal_green">#4ADE80</color>
+    <color name="signal_yellow">#FACC15</color>
+    <color name="signal_orange">#FB923C</color>
+    <color name="signal_red">#F87171</color>
+</resources>
