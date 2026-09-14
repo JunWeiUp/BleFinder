@@ -21,8 +21,6 @@ Find lost Bluetooth devices by tracking their signal strength (RSSI) in real tim
   - Live signal-history chart
   - **Beep that speeds up as you approach** — no need to watch the screen while crawling under the bed
   - Vibration on approach; screen stays on while tracking
-- **🧭 Direction compass (body-blocking)** — hold the phone flat against your chest, screen facing out, and turn a full circle in place. Your body blocks the signal from behind you, so the polar plot's strongest sector (green arrow) points toward the device. A white triangle tracks the direction you are facing; the confidence drops when reflections create multiple strong sectors.
-- **🗺 Signal trail heatmap** — walk around holding the phone upright as usual; your path is drawn and colored by signal strength (green = closest). Look back and head straight for the greenest stretch.
 - Bilingual UI (English / 简体中文), dark theme, works from Android 5.0 (API 21) and adapts to the Android 12+ Bluetooth permission model.
 
 ## Getting the app

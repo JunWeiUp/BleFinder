@@ -170,27 +170,6 @@
                     android:layout_height="110dp"
                     android:layout_marginTop="16dp" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btn_compass"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/compass" />
-
-                    <Button
-                        android:id="@+id/btn_trail"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:text="@string/trail" />
-                </LinearLayout>
-
                 <CheckBox
                     android:id="@+id/check_vibrate"
                     android:layout_width="wrap_content"
@@ -216,110 +195,6 @@
                     android:text="@string/tips"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
-            </LinearLayout>
-
-            <!-- ===== 方向罗盘面板 ===== -->
-            <LinearLayout
-                android:id="@+id/section_compass"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:lineSpacingExtra="4dp"
-                    android:text="@string/compass_hint"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <com.blefinder.app.CompassView
-                    android:id="@+id/compass_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="300dp"
-                    android:layout_marginTop="8dp" />
-
-                <TextView
-                    android:id="@+id/compass_status"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:text="@string/compass_none"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btn_compass_reset"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/compass_reset" />
-
-                    <Button
-                        android:id="@+id/btn_compass_close"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:text="@string/close" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- ===== 轨迹热力图面板 ===== -->
-            <LinearLayout
-                android:id="@+id/section_trail"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:lineSpacingExtra="4dp"
-                    android:text="@string/trail_hint"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <com.blefinder.app.TrailView
-                    android:id="@+id/trail_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="320dp"
-                    android:layout_marginTop="8dp" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btn_trail_clear"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/trail_clear" />
-
-                    <Button
-                        android:id="@+id/btn_trail_close"
-                        style="?android:attr/buttonBarButtonStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:text="@string/close" />
-                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
